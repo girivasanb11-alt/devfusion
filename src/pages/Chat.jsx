@@ -5,6 +5,36 @@ import { ref, onValue, push } from 'firebase/database';
 import { db, rtdb } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 
+// Avatar details generator
+const getAvatarDetails = (name) => {
+  const colors = [
+    'bg-red-100 text-red-800 border-red-200',
+    'bg-orange-100 text-orange-800 border-orange-200',
+    'bg-amber-100 text-amber-800 border-amber-200',
+    'bg-green-100 text-green-800 border-green-200',
+    'bg-teal-100 text-teal-800 border-teal-200',
+    'bg-blue-100 text-blue-800 border-blue-200',
+    'bg-indigo-100 text-indigo-800 border-indigo-200',
+    'bg-purple-100 text-purple-800 border-purple-200',
+    'bg-pink-100 text-pink-800 border-pink-200',
+  ];
+  let sum = 0;
+  const cleanName = name || 'Anonymous';
+  for (let i = 0; i < cleanName.length; i++) {
+    sum += cleanName.charCodeAt(i);
+  }
+  const colorClass = colors[sum % colors.length];
+  
+  const initials = cleanName
+    .split(' ')
+    .map(part => part[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+    
+  return { colorClass, initials };
+};
+
 export default function Chat() {
   const { uid } = useParams(); // other user's uid
   const { currentUser } = useAuth();
@@ -90,6 +120,19 @@ export default function Chat() {
     }
   };
 
+  // Smart suggestions
+  const smartReplies = [
+    "When are you free? 📅",
+    "Let's schedule a session! 🎯",
+    "Can you teach me more about this? 🤔"
+  ];
+
+  const handleSmartReplyClick = (replyText) => {
+    setNewMessage(replyText);
+  };
+
+  const otherUserAvatar = otherUser ? getAvatarDetails(otherUser.name) : { colorClass: 'bg-gray-150', initials: '' };
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Top Bar */}
@@ -103,18 +146,23 @@ export default function Chat() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </div>
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">{otherUser ? otherUser.name : 'Loading...'}</h2>
-            {otherUser && (
-              <p className="text-xs text-gray-500">{otherUser.college || 'SkillSwap Member'}</p>
-            )}
+          <div className="flex items-center space-x-2">
+            <div className={`w-9 h-9 rounded-full border flex items-center justify-center font-bold text-xs ${otherUserAvatar.colorClass}`}>
+              {otherUserAvatar.initials}
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-gray-900">{otherUser ? otherUser.name : 'Loading...'}</h2>
+              {otherUser && (
+                <p className="text-[10px] text-gray-500 font-medium">{otherUser.college || 'SkillSwap Member'}</p>
+              )}
+            </div>
           </div>
         </div>
 
         {messages.length >= 3 && (
           <div 
             onClick={() => navigate(`/review/${uid}`)}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer transition-colors shadow-sm"
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer transition-colors shadow-sm"
           >
             Rate Session
           </div>
@@ -132,7 +180,7 @@ export default function Chat() {
             <svg className="w-12 h-12 mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            <p className="text-sm font-medium">No messages yet. Send a message to start swapping skills!</p>
+            <p className="text-sm font-medium">No messages yet. Send a message or a quick reply to start swapping skills!</p>
           </div>
         ) : (
           messages.map((msg) => {
@@ -147,8 +195,8 @@ export default function Chat() {
                   }`}>
                     {msg.text}
                   </div>
-                  <span className="text-[10px] text-gray-400 mt-1 px-1">
-                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                  <span className="text-[9px] text-gray-400 mt-1 px-1 font-semibold">
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: false })}
                   </span>
                 </div>
               </div>
@@ -158,26 +206,24 @@ export default function Chat() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Rate notice if >= 3 messages */}
-      {messages.length >= 3 && (
-        <div className="bg-blue-50 border-t border-blue-200 px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-2 text-blue-800">
-            <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-            </svg>
-            <span className="text-xs sm:text-sm font-medium">Have you finished your learning session? You can now rate it.</span>
+      {/* Suggestion Chips and Input Container */}
+      <div className="bg-white border-t p-4 space-y-3">
+        {/* Quick replies - show only if newMessage is empty */}
+        {newMessage.length === 0 && (
+          <div className="flex flex-wrap gap-2 justify-center py-1">
+            {smartReplies.map((replyText, index) => (
+              <div 
+                key={index}
+                onClick={() => handleSmartReplyClick(replyText)}
+                className="px-3 py-1.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 hover:text-gray-900 border border-gray-200 rounded-full cursor-pointer transition-all active:scale-95 shadow-2xs"
+              >
+                {replyText}
+              </div>
+            ))}
           </div>
-          <div 
-            onClick={() => navigate(`/review/${uid}`)}
-            className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1.5 rounded-lg cursor-pointer transition-colors shadow-sm whitespace-nowrap"
-          >
-            Rate Session
-          </div>
-        </div>
-      )}
+        )}
 
-      {/* Input Box */}
-      <div className="bg-white border-t p-4">
+        {/* Input Bar */}
         <div className="flex items-center space-x-2 max-w-4xl mx-auto">
           <input
             type="text"

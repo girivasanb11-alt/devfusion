@@ -13,6 +13,7 @@ export default function Review() {
   const [stars, setStars] = useState(0);
   const [hoverStars, setHoverStars] = useState(0);
   const [text, setText] = useState('');
+  const [selectedSkills, setSelectedSkills] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetchingUser, setFetchingUser] = useState(true);
   const [error, setError] = useState('');
@@ -38,6 +39,14 @@ export default function Review() {
     fetchUser();
   }, [uid]);
 
+  const handleSkillToggle = (skillName) => {
+    if (selectedSkills.includes(skillName)) {
+      setSelectedSkills(prev => prev.filter(s => s !== skillName));
+    } else {
+      setSelectedSkills(prev => [...prev, skillName]);
+    }
+  };
+
   const handleSubmit = async () => {
     if (stars === 0) {
       setError('Please select a star rating between 1 and 5.');
@@ -55,6 +64,7 @@ export default function Review() {
         revieweeId: uid,
         stars: Number(stars),
         text: text.trim(),
+        skillsRated: selectedSkills,
         timestamp: serverTimestamp()
       });
 
@@ -86,14 +96,19 @@ export default function Review() {
         let newBadges = [...(userData.badges || [])];
 
         // Award badge logic
-        if (newSessionsCount >= 3 && avgRating >= 4) {
+        if (newSessionsCount >= 1) {
+          if (!newBadges.includes("🎓 First Session")) {
+            newBadges.push("🎓 First Session");
+          }
+        }
+        if (newSessionsCount >= 3 && avgRating >= 4.0) {
           if (!newBadges.includes("⭐ Top Mentor")) {
             newBadges.push("⭐ Top Mentor");
           }
         }
-        if (newSessionsCount >= 1) {
-          if (!newBadges.includes("🎓 First Session")) {
-            newBadges.push("🎓 First Session");
+        if (newSessionsCount >= 10) {
+          if (!newBadges.includes("🏆 Expert Mentor")) {
+            newBadges.push("🏆 Expert Mentor");
           }
         }
 
@@ -125,27 +140,27 @@ export default function Review() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="text-center text-3xl font-extrabold text-gray-900">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+        <h2 className="text-3xl font-extrabold text-gray-900">
           Rate your session
         </h2>
         {otherUser && (
-          <p className="mt-2 text-center text-sm text-gray-600">
-            with <span className="font-semibold text-blue-600">{otherUser.name}</span> from {otherUser.college}
+          <p className="mt-2 text-sm text-gray-600">
+            with <span className="font-semibold text-blue-600">{otherUser.name}</span>
           </p>
         )}
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow-md rounded-xl sm:px-10 border border-gray-100">
+        <div className="bg-white py-8 px-4 shadow-md rounded-xl sm:px-10 border border-gray-100 space-y-6">
           {error && (
-            <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4 text-sm text-red-700">
+            <div className="bg-red-50 border-l-4 border-red-400 p-4 text-sm text-red-700 rounded">
               {error}
             </div>
           )}
 
           {/* Star Selection */}
-          <div className="flex flex-col items-center mb-6">
+          <div className="flex flex-col items-center">
             <span className="text-sm font-semibold text-gray-700 mb-2">Overall Rating</span>
             <div className="flex space-x-2">
               {[1, 2, 3, 4, 5].map((star) => (
@@ -171,22 +186,56 @@ export default function Review() {
             )}
           </div>
 
+          {/* Skills Checked Options */}
+          {otherUser && otherUser.skillsOffered && otherUser.skillsOffered.length > 0 && (
+            <div className="space-y-2 border-t pt-4">
+              <span className="block text-sm font-semibold text-gray-700">Which skills did they teach you?</span>
+              <div className="flex flex-wrap gap-2">
+                {otherUser.skillsOffered.map((skillObj, index) => {
+                  const isChecked = selectedSkills.includes(skillObj.skill);
+                  return (
+                    <div 
+                      key={index}
+                      onClick={() => handleSkillToggle(skillObj.skill)}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer select-none transition-all ${
+                        isChecked 
+                          ? 'bg-blue-50 border-blue-500 text-blue-700 font-semibold shadow-2xs' 
+                          : 'bg-gray-50 border-gray-250 text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                        isChecked ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300'
+                      }`}>
+                        {isChecked && (
+                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className="text-xs">{skillObj.skill}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Text Input */}
-          <div className="mb-6">
-            <span className="block text-sm font-semibold text-gray-700 mb-2">
+          <div className="space-y-2 border-t pt-4">
+            <span className="block text-sm font-semibold text-gray-700">
               Write a Review
             </span>
             <textarea
               rows="4"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Share details of your experience. Did they explain things clearly? Were they helpful?"
+              placeholder="Tell others about your learning session..."
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none"
             />
           </div>
 
-          {/* Submit Button */}
-          <div className="flex space-x-3">
+          {/* Action Buttons */}
+          <div className="flex space-x-3 pt-2">
             <div
               onClick={() => navigate('/matches')}
               className="flex-1 text-center px-4 py-3 border border-gray-200 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 cursor-pointer transition-colors shadow-sm"

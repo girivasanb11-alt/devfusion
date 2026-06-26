@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
@@ -302,8 +302,16 @@ const getAvatarDetails = (name) => {
 export default function Matches() {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [matches, setMatches] = useState([]);
+
+  const getNavLinkClass = (path) => {
+    const isActive = location.pathname === path;
+    return isActive 
+      ? "text-blue-600 font-bold border-b-2 border-blue-600 pb-1"
+      : "text-gray-600 hover:text-blue-600 font-medium transition-colors";
+  };
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
 
@@ -409,9 +417,9 @@ export default function Matches() {
               <span className="font-bold text-xl text-blue-600">SkillSwap</span>
             </div>
             <div className="flex items-center space-x-6">
-              <Link to="/profile" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">My Profile</Link>
-              <Link to="/matches" className="text-blue-600 font-bold">Matches</Link>
-              <Link to="/leaderboard" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">Leaderboard</Link>
+              <Link to="/profile" className={getNavLinkClass('/profile')}>My Profile</Link>
+              <Link to="/matches" className={getNavLinkClass('/matches')}>Matches</Link>
+              <Link to="/leaderboard" className={getNavLinkClass('/leaderboard')}>Leaderboard</Link>
               <div 
                 onClick={logout}
                 className="text-gray-600 hover:text-red-600 font-medium transition-colors cursor-pointer"

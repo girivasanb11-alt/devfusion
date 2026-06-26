@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ProfileSetup from './pages/ProfileSetup';
 import Matches from './pages/Matches';
+import Profile from './pages/Profile';
 import Chat from './pages/Chat';
 import Review from './pages/Review';
 import Leaderboard from './pages/Leaderboard';
@@ -29,6 +30,12 @@ export default function App() {
           <Route path="/matches" element={
             <ProtectedRoute>
               <Matches />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           } />
 
