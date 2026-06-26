@@ -4,6 +4,36 @@ import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 
+// Avatar Style Generator based on name
+const getAvatarDetails = (name) => {
+  const colors = [
+    'bg-red-100 text-red-800 border-red-200',
+    'bg-orange-100 text-orange-800 border-orange-200',
+    'bg-amber-100 text-amber-800 border-amber-200',
+    'bg-green-100 text-green-800 border-green-200',
+    'bg-teal-100 text-teal-800 border-teal-200',
+    'bg-blue-100 text-blue-800 border-blue-200',
+    'bg-indigo-100 text-indigo-800 border-indigo-200',
+    'bg-purple-100 text-purple-800 border-purple-200',
+    'bg-pink-100 text-pink-800 border-pink-200',
+  ];
+  let sum = 0;
+  const cleanName = name || 'Anonymous';
+  for (let i = 0; i < cleanName.length; i++) {
+    sum += cleanName.charCodeAt(i);
+  }
+  const colorClass = colors[sum % colors.length];
+  
+  const initials = cleanName
+    .split(' ')
+    .map(part => part[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+    
+  return { colorClass, initials };
+};
+
 export default function Leaderboard() {
   const { currentUser, logout } = useAuth();
   const [users, setUsers] = useState([]);
@@ -48,38 +78,48 @@ export default function Leaderboard() {
     rank: idx + 1
   }));
 
-  // Top 10 users
-  const top10 = rankedUsers.slice(0, 10);
+  // Top 3 Podium Users
+  const top1 = rankedUsers[0];
+  const top2 = rankedUsers[1];
+  const top3 = rankedUsers[2];
+
+  // Rank 4-10 table users
+  const tableUsers = rankedUsers.slice(3, 10);
 
   // Check if current user is in top 10
-  const isCurrentUserInTop10 = currentUser && top10.some(u => u.uid === currentUser.uid);
+  const isCurrentUserInTop10 = currentUser && rankedUsers.slice(0, 10).some(u => u.uid === currentUser.uid);
 
   // Get current user ranked info
   const currentUserRanked = currentUser && rankedUsers.find(u => u.uid === currentUser.uid);
 
-  // Helper to determine row background & border style based on rank and if it is the current user
+  // Calculate skill stats
+  const getPopularSkills = () => {
+    const skillCounts = {};
+    users.forEach(user => {
+      (user.skillsOffered || []).forEach(sObj => {
+        const skillName = sObj.skill;
+        if (skillName) {
+          const cleanSkill = skillName.trim();
+          skillCounts[cleanSkill] = (skillCounts[cleanSkill] || 0) + 1;
+        }
+      });
+    });
+
+    return Object.entries(skillCounts)
+      .map(([skill, count]) => ({ skill, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+  };
+
+  const popularSkills = getPopularSkills();
+
+  // Helper to determine row bg and border style based on rank and if current user
   const getRowStyle = (user) => {
     const isCurrent = currentUser && user.uid === currentUser.uid;
     if (isCurrent) {
       return 'bg-blue-50 border-l-4 border-blue-500 hover:bg-blue-100 font-semibold';
     }
-    if (user.rank === 1) {
-      return 'bg-yellow-50 border-l-4 border-yellow-400 hover:bg-yellow-100';
-    }
-    if (user.rank === 2) {
-      return 'bg-slate-50 border-l-4 border-slate-300 hover:bg-slate-100';
-    }
-    if (user.rank === 3) {
-      return 'bg-amber-50/50 border-l-4 border-amber-500 hover:bg-amber-50';
-    }
     return 'bg-white hover:bg-gray-50 border-l-4 border-transparent';
-  };
-
-  const getRankBadge = (rank) => {
-    if (rank === 1) return <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100 text-yellow-800 font-bold text-lg">🥇</span>;
-    if (rank === 2) return <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-200 text-slate-800 font-bold text-lg">🥈</span>;
-    if (rank === 3) return <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-100 text-amber-900 font-bold text-lg">🥉</span>;
-    return <span className="text-gray-500 font-medium">{rank}</span>;
   };
 
   return (
@@ -118,129 +158,295 @@ export default function Leaderboard() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         ) : (
-          <div className="bg-white shadow-md rounded-xl overflow-hidden border border-gray-150">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-20">
-                      Rank
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Name
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      College
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Sessions
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Rating
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Badges
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-150 bg-white">
-                  {top10.map((user) => (
-                    <tr key={user.uid} className={`transition-colors ${getRowStyle(user)}`}>
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                        {getRankBadge(user.rank)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                        {user.name} {currentUser && user.uid === currentUser.uid && ' (You)'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {user.college || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900 font-medium">
-                        {user.sessionsCount !== undefined ? user.sessionsCount : (user.sessionCount || 0)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                        <div className="flex items-center justify-center space-x-1">
-                          <span className="text-yellow-400">★</span>
-                          <span className="text-gray-900 font-medium">{(user.rating || 0).toFixed(1)}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="flex flex-wrap gap-1.5">
-                          {user.badges && user.badges.length > 0 ? (
-                            user.badges.map((badge, idx) => (
-                              <span 
-                                key={idx} 
-                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                  badge.includes('Top') 
-                                    ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' 
-                                    : 'bg-green-100 text-green-800 border border-green-200'
-                                }`}
-                              >
-                                {badge}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-gray-400 text-xs italic">None</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+          <>
+            {/* Podium Section (Top 3) */}
+            <div className="flex flex-col md:flex-row items-center md:items-end justify-center gap-6 mb-12 mt-6">
+              
+              {/* Rank 2 - Silver */}
+              {top2 && (
+                <div className="order-2 md:order-1 bg-white border border-slate-200 rounded-2xl p-6 text-center w-full md:w-64 h-80 flex flex-col justify-between shadow-sm relative border-t-8 border-t-slate-300">
+                  <div className="absolute top-3 right-3 text-sm font-extrabold text-slate-400">#2</div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-4xl mb-2">🥈</span>
+                    <div className={`w-14 h-14 rounded-full border-2 flex items-center justify-center font-bold text-lg mb-3 ${getAvatarDetails(top2.name).colorClass}`}>
+                      {getAvatarDetails(top2.name).initials}
+                    </div>
+                    <h2 className="text-base font-bold text-gray-900 truncate w-full">{top2.name}</h2>
+                    <p className="text-xs text-gray-500 truncate w-full">{top2.college}</p>
+                  </div>
+                  
+                  <div className="mt-4 border-t pt-3 flex items-center justify-around text-xs font-semibold text-gray-600">
+                    <div>
+                      <span className="block text-[10px] text-gray-400 uppercase">Sessions</span>
+                      <span className="text-sm font-extrabold text-gray-800">
+                        {top2.sessionsCount !== undefined ? top2.sessionsCount : (top2.sessionCount || 0)}
+                      </span>
+                    </div>
+                    <div className="border-r h-6 border-gray-200"></div>
+                    <div>
+                      <span className="block text-[10px] text-gray-400 uppercase">Rating</span>
+                      <span className="text-sm font-extrabold text-gray-800 flex items-center">
+                        ★ {(top2.rating || 0).toFixed(1)}
+                      </span>
+                    </div>
+                  </div>
 
-                  {/* Render separator and current user if outside top 10 */}
-                  {currentUserRanked && !isCurrentUserInTop10 && (
-                    <>
-                      <tr className="bg-gray-50">
-                        <td colSpan="6" className="px-6 py-2 text-center text-sm font-semibold text-gray-400 tracking-widest bg-gray-50 border-t border-b select-none">
-                          •••
-                        </td>
-                      </tr>
-                      <tr className={`transition-colors ${getRowStyle(currentUserRanked)}`}>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                          {getRankBadge(currentUserRanked.rank)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                          {currentUserRanked.name} (You)
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {currentUserRanked.college || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900 font-medium">
-                          {currentUserRanked.sessionsCount !== undefined ? currentUserRanked.sessionsCount : (currentUserRanked.sessionCount || 0)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                          <div className="flex items-center justify-center space-x-1">
-                            <span className="text-yellow-400">★</span>
-                            <span className="text-gray-900 font-medium">{(currentUserRanked.rating || 0).toFixed(1)}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <div className="flex flex-wrap gap-1.5">
-                            {currentUserRanked.badges && currentUserRanked.badges.length > 0 ? (
-                              currentUserRanked.badges.map((badge, idx) => (
-                                <span 
-                                  key={idx} 
-                                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                    badge.includes('Top') 
-                                      ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' 
-                                      : 'bg-green-100 text-green-800 border border-green-200'
-                                  }`}
-                                >
-                                  {badge}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-gray-400 text-xs italic">None</span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    </>
-                  )}
-                </tbody>
-              </table>
+                  <div className="flex flex-wrap justify-center gap-1 mt-3">
+                    {(top2.badges || []).map((badge, idx) => (
+                      <span key={idx} className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-slate-100 text-slate-800 border border-slate-200">
+                        {badge}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Rank 1 - Gold */}
+              {top1 && (
+                <div className="order-1 md:order-2 bg-white border border-yellow-250 rounded-2xl p-6 text-center w-full md:w-72 h-90 flex flex-col justify-between shadow-md relative border-t-8 border-t-yellow-400 md:-top-4">
+                  <div className="absolute top-3 right-3 text-sm font-extrabold text-yellow-600">#1</div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-5xl mb-2">🥇</span>
+                    <div className={`w-16 h-16 rounded-full border-2 flex items-center justify-center font-bold text-xl mb-3 ${getAvatarDetails(top1.name).colorClass}`}>
+                      {getAvatarDetails(top1.name).initials}
+                    </div>
+                    <h2 className="text-lg font-bold text-gray-900 truncate w-full">{top1.name}</h2>
+                    <p className="text-xs text-gray-500 truncate w-full">{top1.college}</p>
+                  </div>
+                  
+                  <div className="mt-4 border-t pt-3 flex items-center justify-around text-xs font-semibold text-gray-600">
+                    <div>
+                      <span className="block text-[10px] text-gray-400 uppercase">Sessions</span>
+                      <span className="text-base font-extrabold text-gray-800">
+                        {top1.sessionsCount !== undefined ? top1.sessionsCount : (top1.sessionCount || 0)}
+                      </span>
+                    </div>
+                    <div className="border-r h-6 border-gray-200"></div>
+                    <div>
+                      <span className="block text-[10px] text-gray-400 uppercase">Rating</span>
+                      <span className="text-base font-extrabold text-gray-800 flex items-center">
+                        ★ {(top1.rating || 0).toFixed(1)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap justify-center gap-1 mt-3">
+                    {(top1.badges || []).map((badge, idx) => (
+                      <span key={idx} className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-yellow-50 text-yellow-800 border border-yellow-200">
+                        {badge}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Rank 3 - Bronze */}
+              {top3 && (
+                <div className="order-3 bg-white border border-amber-200 rounded-2xl p-6 text-center w-full md:w-64 h-76 flex flex-col justify-between shadow-sm relative border-t-8 border-t-amber-500">
+                  <div className="absolute top-3 right-3 text-sm font-extrabold text-amber-600">#3</div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-4xl mb-2">🥉</span>
+                    <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center font-bold text-sm mb-3 ${getAvatarDetails(top3.name).colorClass}`}>
+                      {getAvatarDetails(top3.name).initials}
+                    </div>
+                    <h2 className="text-base font-bold text-gray-900 truncate w-full">{top3.name}</h2>
+                    <p className="text-xs text-gray-500 truncate w-full">{top3.college}</p>
+                  </div>
+                  
+                  <div className="mt-4 border-t pt-3 flex items-center justify-around text-xs font-semibold text-gray-600">
+                    <div>
+                      <span className="block text-[10px] text-gray-400 uppercase">Sessions</span>
+                      <span className="text-sm font-extrabold text-gray-800">
+                        {top3.sessionsCount !== undefined ? top3.sessionsCount : (top3.sessionCount || 0)}
+                      </span>
+                    </div>
+                    <div className="border-r h-6 border-gray-200"></div>
+                    <div>
+                      <span className="block text-[10px] text-gray-400 uppercase">Rating</span>
+                      <span className="text-sm font-extrabold text-gray-800 flex items-center">
+                        ★ {(top3.rating || 0).toFixed(1)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap justify-center gap-1 mt-3">
+                    {(top3.badges || []).map((badge, idx) => (
+                      <span key={idx} className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-amber-50 text-amber-900 border border-amber-200">
+                        {badge}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+
+            {/* Leaderboard Table (Ranks 4-10) */}
+            <div className="bg-white shadow-md rounded-xl overflow-hidden border border-gray-150">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-20">
+                        Rank
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Name
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        College
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Sessions
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Rating
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Badges
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-150 bg-white">
+                    {tableUsers.map((user) => {
+                      const avatar = getAvatarDetails(user.name);
+                      return (
+                        <tr key={user.uid} className={`transition-colors ${getRowStyle(user)}`}>
+                          <td className="px-6 py-4 whitespace-nowrap text-left text-sm font-bold text-gray-500">
+                            #{user.rank}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium flex items-center space-x-3">
+                            <div className={`w-8 h-8 rounded-full border flex items-center justify-center font-bold text-xs ${avatar.colorClass}`}>
+                              {avatar.initials}
+                            </div>
+                            <span>{user.name} {currentUser && user.uid === currentUser.uid && ' (You)'}</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {user.college || 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900 font-medium">
+                            {user.sessionsCount !== undefined ? user.sessionsCount : (user.sessionCount || 0)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                            <div className="flex items-center justify-center space-x-1">
+                              <span className="text-yellow-400">★</span>
+                              <span className="text-gray-900 font-semibold">{(user.rating || 0).toFixed(1)}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <div className="flex flex-wrap gap-1.5">
+                              {user.badges && user.badges.length > 0 ? (
+                                user.badges.map((badge, idx) => (
+                                  <span 
+                                    key={idx} 
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${
+                                      badge.includes('Top') 
+                                        ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' 
+                                        : 'bg-green-100 text-green-800 border border-green-200'
+                                    }`}
+                                  >
+                                    {badge}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-gray-400 text-xs italic">None</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {/* Separator and Current User if outside top 10 */}
+                    {currentUserRanked && !isCurrentUserInTop10 && (
+                      <>
+                        <tr className="bg-gray-50">
+                          <td colSpan="6" className="px-6 py-2 text-center text-sm font-semibold text-gray-400 tracking-widest bg-gray-50 border-t border-b select-none">
+                            •••
+                          </td>
+                        </tr>
+                        <tr className={`transition-colors ${getRowStyle(currentUserRanked)}`}>
+                          <td className="px-6 py-4 whitespace-nowrap text-left text-sm font-bold text-gray-500">
+                            #{currentUserRanked.rank}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium flex items-center space-x-3">
+                            <div className={`w-8 h-8 rounded-full border flex items-center justify-center font-bold text-xs ${getAvatarDetails(currentUserRanked.name).colorClass}`}>
+                              {getAvatarDetails(currentUserRanked.name).initials}
+                            </div>
+                            <span>{currentUserRanked.name} (You)</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {currentUserRanked.college || 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900 font-medium">
+                            {currentUserRanked.sessionsCount !== undefined ? currentUserRanked.sessionsCount : (currentUserRanked.sessionCount || 0)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                            <div className="flex items-center justify-center space-x-1">
+                              <span className="text-yellow-400">★</span>
+                              <span className="text-gray-900 font-semibold">{(currentUserRanked.rating || 0).toFixed(1)}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <div className="flex flex-wrap gap-1.5">
+                              {currentUserRanked.badges && currentUserRanked.badges.length > 0 ? (
+                                currentUserRanked.badges.map((badge, idx) => (
+                                  <span 
+                                    key={idx} 
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${
+                                      badge.includes('Top') 
+                                        ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' 
+                                        : 'bg-green-100 text-green-800 border border-green-200'
+                                    }`}
+                                  >
+                                    {badge}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-gray-400 text-xs italic">None</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      </>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Popular Skills Bar Chart */}
+            <div className="bg-white shadow-md rounded-xl p-6 border border-gray-150 mt-12">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Most Popular Skills Offered</h2>
+              <p className="text-sm text-gray-500 mb-6 font-medium">Skills that mentors are sharing most in the community</p>
+              
+              <div className="space-y-4">
+                {popularSkills.map((item, idx) => {
+                  const maxCount = popularSkills.length > 0 ? popularSkills[0].count : 1;
+                  const percentage = `${(item.count / maxCount) * 100}%`;
+                  
+                  return (
+                    <div key={idx} className="flex items-center">
+                      <div className="w-32 text-sm font-semibold text-gray-700 truncate pr-2">
+                        {item.skill}
+                      </div>
+                      <div className="flex-1 bg-gray-100 rounded-full h-4 relative overflow-hidden">
+                        <div 
+                          className="bg-blue-600 h-full rounded-full transition-all duration-500" 
+                          style={{ width: percentage }}
+                        ></div>
+                      </div>
+                      <div className="w-20 text-right text-xs font-bold text-gray-600 pl-3">
+                        {item.count} {item.count === 1 ? 'mentor' : 'mentors'}
+                      </div>
+                    </div>
+                  );
+                })}
+                {popularSkills.length === 0 && (
+                  <p className="text-sm text-gray-400 italic">No skills recorded yet.</p>
+                )}
+              </div>
+            </div>
+          </>
         )}
       </main>
     </div>
