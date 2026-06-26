@@ -1,0 +1,17 @@
+{
+  "rules": {
+    "chats": {
+      "$matchId": {
+        "messages": {
+          // Any logged-in user can read/write to a chat room
+          ".read": "auth != null",
+          ".write": "auth != null",
+          "$pushId": {
+            // Validate chat messages server-side
+            ".validate": "newData.hasChildren(['senderUid', 'text', 'timestamp']) && newData.child('senderUid').val() === auth.uid && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 1000"
+          }
+        }
+      }
+    }
+  }
+}

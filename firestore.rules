@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // No one can delete anything globally
+    match /{document=**} {
+      allow delete: if false;
+    }
+
+    // USERS COLLECTION
+    match /users/{userId} {
+      // Any logged-in user can READ all user profiles
+      allow read: if request.auth != null;
+      // Only the owner (uid match) can CREATE or UPDATE their own user doc
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // MATCHES COLLECTION
+    match /matches/{matchId} {
+      // Only match participants (user1 or user2) can READ or UPDATE a match doc
+      allow read, update: if request.auth != null && (resource.data.user1 == request.auth.uid || resource.data.user2 == request.auth.uid);
+      // Ensure the creator is one of the participants
+      allow create: if request.auth != null && (request.resource.data.user1 == request.auth.uid || request.resource.data.user2 == request.auth.uid);
+    }
+
+    // REVIEWS COLLECTION
+    match /reviews/{reviewId} {
+      // Any logged-in user can read reviews
+      allow read: if request.auth != null;
+      // Only the reviewer themselves can CREATE a review
+      allow create: if request.auth != null && request.resource.data.reviewerId == request.auth.uid;
+      // Reviews cannot be updated
+      allow update: if false;
+    }
+  }
+}
